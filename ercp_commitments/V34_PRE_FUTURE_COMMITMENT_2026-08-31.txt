@@ -1,0 +1,20 @@
+ERCP V34 pre-future commitment
+protocol=ERCP-v34-drand-only-dual-56bit-OTP-QRM28-v1
+target_draw=2026-09-01
+future_drand_chain_hash=52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971
+future_drand_round=31830413
+future_drand_round_utc=2026-09-01T20:30:03Z
+experiment_lock_sha256=248ce71656241b67dc8858af803a0cd920e3c972a19c145b28d0fc376f46e04d
+premask_decode_commitment_sha256=5824c7ecf3689479b199dd70d9a3b090c2df5f747cdf04da24d25e300723c453
+dual_receiver_capture_sha256=4e534f02446e89c3c2bbebe768a747727dd79c261f90ee1416b7d31f04241972
+payload_receiver_sha256=193283816806c5212af82b23ca8fed1d35aea5162136c51aa9453e4b41ac5b5a
+calibration_receiver_sha256=8d124c7374a07e8235c2b3c8a71e6de82fe8753e53da0aa004ebfd8009483ccf
+premask_payload_decode=10863008
+premask_calibration_decode=0
+primary_rule=(premask_payload_decode XOR K0)==official_row_rank AND (premask_calibration_decode XOR K1)==0
+mask_rule=K0||K1 = first 56 MSB bits of BLS-verified drand quicknet randomness at round 31830413
+joint_exact_null_if_uniform=2^-56
+no_source_substitution=true
+no_lag_search=true
+no_posthoc_decoder_change=true
+This commitment contains hashes and predetermined outputs only; no claim of retrocausality is made.
