@@ -1,0 +1,30 @@
+ERCP V36 PRE-SOURCE HASH COMMITMENT
+
+Purpose: public append-only provenance commitment made before the pinned future source event. This is a timestamp/provenance record only; it is not evidence of future-to-past signaling.
+
+Original V36 prospective release:
+- protocol: ERCP-v36-drand-only-dual-56bit-QRM28-physical-replication-v1
+- ZIP SHA-256: 38297abe02b70c1147af19db8abf89b9983f8ef229fdb9bb33dbb6852d1f1a34
+- release Merkle root: 373e0ff837fd5c05c9db4adf1224cc1282023f8d1f7bf03c55708103741281dc
+- frozen lock SHA-256: fd57a5d60be5324aadc3086348ced1ca7af86a4d68de2bfd3f963218b9faca48
+- premask payload decode: 66994897
+- premask calibration decode: 42377853
+
+Pre-source integrity + Gate-A addendum:
+- addendum ZIP SHA-256: 7cb0db3c43c3cba63fefa912dd03e16469a74223c87eafd9e5eb0e8f76889611
+- addendum Merkle root: bca2436cfd85f97c1c7b3f202fba5e066cdceebebe3c5e9c36fef02da9491152
+- addendum lock SHA-256: 2e16511fcfbf0d97c6349c98465323457317d07ec090d6ad59e25951760d3944
+- original evaluator validity certificate status: falsified by pre-source fail-open counterexample; original primary algebra remains unchanged
+- hardened evaluation requires external BLS verification and full actuator/source/transcript binding
+- Gate-A soft statistic: -clip(residual, -1.25*sigma, +1.25*sigma)/sigma, sigma=frozen 1.4826*MAD
+- Gate-A p-values: exact conditional randomization over all 2^28 future messages per channel; two soft channels only, Bonferroni x2
+- one-sided five-sigma family threshold: 2.866515718791933e-7
+
+Pinned future source:
+- network: drand quicknet
+- chain hash: 52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971
+- round: 31916813
+- round time UTC: 2026-09-04T20:30:03+00:00
+- source substitution: forbidden
+
+No post-source edit of this commitment can change the hashes committed above. Any later correction must be a new separately timestamped artifact.
