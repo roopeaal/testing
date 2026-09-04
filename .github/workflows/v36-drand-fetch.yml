@@ -1,0 +1,22 @@
+name: V36 drand fetch
+on:
+  push:
+    paths:
+      - '.github/workflows/v36-drand-fetch.yml'
+      - 'ercp/v36-drand-trigger-*'
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch exact V36 drand round from four preregistered relays
+        shell: bash
+        run: |
+          set -euo pipefail
+          CH=52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971
+          R=31916813
+          for U in https://api.drand.sh https://api2.drand.sh https://api3.drand.sh https://drand.cloudflare.com; do
+            echo "BEGIN $U"
+            curl --fail --silent --show-error "$U/$CH/public/$R"
+            echo
+            echo "END $U"
+          done
