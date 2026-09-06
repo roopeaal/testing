@@ -1,0 +1,102 @@
+name: V36 preserved BLS verification audit
+
+on:
+  push:
+    paths:
+      - '.github/workflows/v36-bls-verify.yml'
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go used by drand v2.1.7
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.26.4'
+
+      - name: Verify preserved V36 quicknet beacon with drand v2.1.7
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/v36-bls-audit
+          cd /tmp/v36-bls-audit
+          go mod init v36-bls-audit
+          go get github.com/drand/drand/v2@v2.1.7
+
+          cat > main.go <<'EOF'
+          package main
+
+          import (
+              "bytes"
+              "encoding/hex"
+              "fmt"
+              "os"
+
+              drandcrypto "github.com/drand/drand/v2/crypto"
+          )
+
+          const (
+              round = uint64(31916813)
+              publicKeyHex = "83cf0f2896adee7eb8b5f01fcad3912212c437e0073e911fb90022d3e760183c8c4b450b6a0a6c3ac6a5776a2d1064510d1fec758c921cc22b0e17e63aaf4bcb5ed66304de9cf809bd274ca73bab4af5a6e9c76a4bc09e76eae8991ef5ece45a"
+              signatureHex = "a1a0b13d0cef00331ef721970839ae379a7a7d5bb591e1914b5e63b866286a60cc3c2a4aeed6c062936eabf1f14d5509"
+              randomnessHex = "d9f14c3ab77fd0290e1e499864b305556a4d5b031cc7515a2eb0514871a64158"
+          )
+
+          type preservedBeacon struct {
+              round uint64
+              sig   []byte
+          }
+
+          func (b *preservedBeacon) GetPreviousSignature() []byte { return nil }
+          func (b *preservedBeacon) GetRound() uint64              { return b.round }
+          func (b *preservedBeacon) GetSignature() []byte          { return b.sig }
+
+          func mustHex(s string) []byte {
+              b, err := hex.DecodeString(s)
+              if err != nil {
+                  panic(err)
+              }
+              return b
+          }
+
+          func main() {
+              scheme := drandcrypto.NewPedersenBLSUnchainedG1()
+              if scheme.Name != drandcrypto.SigsOnG1ID {
+                  fmt.Printf("SCHEME_MISMATCH got=%s want=%s\n", scheme.Name, drandcrypto.SigsOnG1ID)
+                  os.Exit(2)
+              }
+
+              pubBytes := mustHex(publicKeyHex)
+              sigBytes := mustHex(signatureHex)
+              wantRandomness := mustHex(randomnessHex)
+
+              pub := scheme.KeyGroup.Point()
+              if err := pub.UnmarshalBinary(pubBytes); err != nil {
+                  fmt.Printf("PUBLIC_KEY_DECODE=false err=%v\n", err)
+                  os.Exit(3)
+              }
+              fmt.Println("PUBLIC_KEY_DECODE=true")
+
+              gotRandomness := drandcrypto.RandomnessFromSignature(sigBytes)
+              randomnessOK := bytes.Equal(gotRandomness, wantRandomness)
+              fmt.Printf("SIGNATURE_TO_RANDOMNESS_SHA256=%t\n", randomnessOK)
+              fmt.Printf("RECOMPUTED_RANDOMNESS=%x\n", gotRandomness)
+              if !randomnessOK {
+                  os.Exit(4)
+              }
+
+              b := &preservedBeacon{round: round, sig: sigBytes}
+              if err := scheme.VerifyBeacon(b, pub); err != nil {
+                  fmt.Printf("BLS_VERIFIED=false err=%v\n", err)
+                  os.Exit(5)
+              }
+
+              fmt.Println("BLS_VERIFIED=true")
+              fmt.Printf("ROUND=%d\n", round)
+              fmt.Printf("SCHEME=%s\n", scheme.Name)
+              fmt.Printf("DRAND_VERSION=v2.1.7\n")
+          }
+          EOF
+
+          go run .
