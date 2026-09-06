@@ -19,10 +19,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          rm -rf /tmp/v36-bls-audit
           mkdir -p /tmp/v36-bls-audit
           cd /tmp/v36-bls-audit
           go mod init v36-bls-audit
-          go get github.com/drand/drand/v2@v2.1.7
+          go get github.com/drand/drand/v2/crypto@v2.1.7
 
           cat > main.go <<'EOF'
           package main
