@@ -1,0 +1,79 @@
+ERCP Gate-A R1 pre-source public commitment
+
+Purpose
+-------
+Prospective source-only Gate-A existence screen. This is deliberately narrower than V36: it tests whether two CPU-timing records frozen now are associated with two later, pre-pinned 28-bit blocks of a future drand quicknet randomness beacon. It does NOT claim controllability, a future actuator, Eurojackpot payload recovery, or time travel.
+
+Earlier receiver freeze
+-----------------------
+spec_id: ERCP-GATEA-R1-SOURCE-ONLY-CPU-TIMING-v1
+capture_start_utc: 2026-09-06T21:26:38.554725+00:00
+capture_end_utc: 2026-09-06T21:26:45.718464+00:00
+samples_per_channel: 262144
+channels: alpha, beta
+alpha_route_fixed_points: 0
+beta_route_fixed_points: 0
+alpha_residual_robust_sigma_ns: 74.13
+beta_residual_robust_sigma_ns: 74.13
+
+Frozen future source
+--------------------
+network: drand quicknet
+chain_hash: 52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971
+public_key: 83cf0f2896adee7eb8b5f01fcad3912212c437e0073e911fb90022d3e760183c8c4b450b6a0a6c3ac6a5776a2d1064510d1fec758c921cc22b0e17e63aaf4bcb5ed66304de9cf809bd274ca73bab4af5a6e9c76a4bc09e76eae8991ef5ece45a
+group_hash: f477d5c89f21a17c863a7f937c6a6d15859414d2be09cd448d4279af331c5d3e
+scheme_id: bls-unchained-g1-rfc9380
+genesis_time: 1692803367
+period_seconds: 3
+pinned_round: 32003213
+pinned_round_unix: 1788813003
+pinned_round_utc: 2026-09-07T20:30:03Z
+pinned_round_europe_helsinki: 2026-09-07T23:30:03+03:00
+alpha_message: randomness MSB bits 0..27
+beta_message: randomness MSB bits 28..55
+source_substitution: FORBIDDEN
+
+Frozen confirmatory analysis
+----------------------------
+codec: frozen QRM28 GF(512) implementation in release
+routing: receiver-derived Sattolo permutation per channel, zero fixed points
+soft_weights: y_i = -clip(residual_i, +/- 1.25*frozen_robust_sigma) / frozen_robust_sigma
+statistic: T(m) = sum_i y_i * (-1)^C_m(i) after frozen derouting
+per_channel_null: exact conditional randomization over all 2^28 future messages; no Gaussian/IID/fair-receiver assumption
+family: alpha + beta soft tests only
+family_p: min(1, 2*min(p_alpha,p_beta))
+strong_candidate_threshold: 2.866515718791933e-7 (one-sided 5 sigma)
+hard_agreement: robustness diagnostic only; no additional discovery opportunity
+clip/direction/decoder/routing/stopping/source round may not be changed after this commitment.
+
+Source validity gates
+---------------------
+- exact chain hash/public key/scheme/round required
+- exact agreement of four public relays on (round, signature, randomness) required
+- SHA256(signature) == randomness required
+- cryptographic BLS VerifyBeacon required using drand v2.1.7 NewPedersenBLSUnchainedG1 and the pinned public key
+- every earlier receiver/code file must match frozen hashes
+- no later source replacement is allowed
+
+The BLS verifier path was already exercised before this source event against preserved quicknet round 31916813 in GitHub Actions run 34060420877: public key decode PASS, SHA256(signature)==randomness PASS, drand v2.1.7 VerifyBeacon PASS.
+
+Immutable release hashes
+------------------------
+release_file: ERCP_GATEA_R1_PROSPECTIVE_RELEASE_2026-09-07.zip
+release_sha256: 5c82056a48b6b8fdb63bf78784d8b6b49776e16d578798341dcbcc0b88986331
+manifest_sha256: 9056cccbac0f11341b889ac65595ae78af787c40a05e74fb12695777553bbfe4
+lock_sha256: 3c424bc30d5a2b9dbec03e61120f128ec61167ceda4a00918ea2070f0f205a65
+
+Frozen code hashes
+------------------
+fetch_gatea_r1_source.py: 528eab3c7b2bd9c15c637db91d5584b09d01e532c9a701b72b73049564e0d2b3
+gatea_r1.py: cb4d48b10661011141521ac1c00fc83a89e9e601d10ef6d2c9bd9c4a48c38648
+gatea_r1_qrm.py: be357ac798a8f02b03c7a67305828270757ebf8a59ae93cefd2433abe971ed3a
+verify_gatea_r1_drand.go: bb26dc6f659da07ce14da9915da7f1a6d07cb48d58d0956f0af9be0c2880e24e
+
+Interpretation frozen now
+-------------------------
+If validity fails: INVALID / INCONCLUSIVE.
+If validity passes and p_family > threshold: NO_GATE_A_SOURCE_PAST_ANOMALY_IN_R1.
+If validity passes and p_family <= threshold: GATE_A_SOURCE_PAST_CORRELATION_CANDIDATE_REQUIRES_INDEPENDENT_REPLICATION.
+A candidate is not proof of backward causation or time travel.
