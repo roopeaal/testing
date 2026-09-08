@@ -1,0 +1,133 @@
+name: Gate-A Actuator R3 prospective release build
+
+on:
+  push:
+    paths:
+      - '.github/workflows/gatea-actuator-r3-prospective-release.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.4'
+
+      - name: Build exact pre-source release from frozen code and NIST receiver
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --quiet numpy numba
+          ROOT="$GITHUB_WORKSPACE/ercp/gatea-actuator-r3"
+          OUT="$GITHUB_WORKSPACE/out"
+          REL="$OUT/release"
+          mkdir -p "$REL/pulses"
+
+          python3 - <<'PY'
+          import urllib.request, json, hashlib, time, pathlib, datetime, os
+          from concurrent.futures import ThreadPoolExecutor, as_completed
+          CHAIN=2;START=1931505;END=1932016;TARGET='2026-09-08T20:30:03.000Z'
+          EXPECTED_RECEIVER_SHA='843738d7bf06dfc7ac2df11bac09c75fd70743ec0da2d898d5fc0150b26cca4f'
+          REL=pathlib.Path(os.environ['GITHUB_WORKSPACE'])/'out'/'release'
+          def parse_ts(s):
+              if not s.endswith('Z'):raise ValueError(s)
+              return datetime.datetime.fromisoformat(s[:-1]+'+00:00')
+          target_dt=parse_ts(TARGET)
+          def fetch_one(idx):
+              url=f'https://beacon.nist.gov/beacon/2.0/chain/{CHAIN}/pulse/{idx}';last=None
+              for attempt in range(8):
+                  try:
+                      req=urllib.request.Request(url,headers={'User-Agent':'ERCP-GateA-Actuator-R3-release/1.0'})
+                      with urllib.request.urlopen(req,timeout=30) as r:raw=r.read()
+                      obj=json.loads(raw);p=obj['pulse']
+                      if int(p['chainIndex'])!=CHAIN or int(p['pulseIndex'])!=idx or int(p.get('statusCode',-1))!=0:raise RuntimeError(f'identity/status {idx}')
+                      lrv=str(p['localRandomValue'])
+                      if len(lrv)!=128 or len(bytes.fromhex(lrv))!=64:raise RuntimeError(f'LRV {idx}')
+                      if parse_ts(p['timeStamp'])>=target_dt:raise RuntimeError(f'not pre-source {idx}')
+                      return idx,raw,obj
+                  except Exception as e:
+                      last=e;time.sleep(min(0.5*(2**attempt),10))
+              raise RuntimeError(f'fetch failed {idx}: {last}')
+          results={}
+          with ThreadPoolExecutor(max_workers=8) as ex:
+              futs=[ex.submit(fetch_one,i) for i in range(START,END+1)]
+              for fut in as_completed(futs):idx,raw,obj=fut.result();results[idx]=(raw,obj)
+          receiver=bytearray();records=[];ts=[]
+          for idx in range(START,END+1):
+              raw,obj=results[idx];p=obj['pulse'];(REL/'pulses'/f'{idx}.json').write_bytes(raw)
+              receiver.extend(bytes.fromhex(p['localRandomValue']));ts.append(parse_ts(p['timeStamp']))
+              records.append({'chainIndex':int(p['chainIndex']),'pulseIndex':int(p['pulseIndex']),'timeStamp':p['timeStamp'],'localRandomValue':p['localRandomValue'],'certificateId':p.get('certificateId'),'signatureValue':p.get('signatureValue'),'outputValue':p.get('outputValue'),'listValues':p.get('listValues'),'uri':p.get('uri'),'raw_sha256':hashlib.sha256(raw).hexdigest()})
+          if any(ts[i]>=ts[i+1] for i in range(len(ts)-1)):raise SystemExit('timestamp order')
+          if len(receiver)!=32768:raise SystemExit('receiver length')
+          got=hashlib.sha256(receiver).hexdigest()
+          if got!=EXPECTED_RECEIVER_SHA:raise SystemExit(f'receiver drift {got}')
+          (REL/'GATEA_ACTUATOR_R3_RECEIVER.bin').write_bytes(receiver)
+          with (REL/'GATEA_ACTUATOR_R3_RECEIVER_RECORDS.jsonl').open('w') as f:
+              for r in records:f.write(json.dumps(r,sort_keys=True,separators=(',',':'))+'\n')
+          meta={'protocol':'ERCP-GATEA-ACTUATOR-R3-NIST-RECEIVER-v1','chain_index':CHAIN,'first_pulse':START,'last_pulse':END,'pulse_count':512,'receiver_field':'localRandomValue','receiver_bytes':32768,'receiver_bits':262144,'receiver_sha256':got,'receiver_records_jsonl_sha256':hashlib.sha256((REL/'GATEA_ACTUATOR_R3_RECEIVER_RECORDS.jsonl').read_bytes()).hexdigest(),'first_timestamp':records[0]['timeStamp'],'last_timestamp':records[-1]['timeStamp'],'last_localRandomValue':records[-1]['localRandomValue'],'last_certificateId':records[-1]['certificateId'],'strictly_increasing_timestamps':True,'all_pulses_before_future_source':True,'future_source_round':32032013,'future_source_utc':'2026-09-08T20:30:03Z','original_capture_run_id':34243531791,'original_capture_job_id':102119523122,'original_capture_commit':'674bc8006e560101ecfa3a030b3d04f69e74a4fb','original_capture_artifact_id':10062990252,'original_capture_artifact_sha256':'43a155aa92b883984332c5921d32769e72d3ec437771a33b0abb3795f43e62b5'}
+          (REL/'GATEA_ACTUATOR_R3_RECEIVER_META.json').write_text(json.dumps(meta,indent=2,sort_keys=True)+'\n')
+          PY
+
+          cp "$ROOT/gatea_actuator_r3_qrm.py" "$REL/"
+          cp "$ROOT/gatea_actuator_r3_eval.py" "$REL/"
+          cp "$ROOT/gatea_actuator_r3_workload.go" "$REL/"
+          cp "$ROOT/fetch_gatea_actuator_r3_source.py" "$REL/"
+          cp "$ROOT/verify_gatea_actuator_r3_drand.go" "$REL/"
+          cp "$ROOT/go.mod" "$REL/"
+          cp "$ROOT/requirements.txt" "$REL/"
+          (cd "$REL" && python gatea_actuator_r3_eval.py selftest | tee VALIDATION_PYTHON.txt && go run gatea_actuator_r3_workload.go -mode selftest | tee VALIDATION_GO.txt)
+
+          python3 - <<'PY'
+          import pathlib,re,hashlib,numpy as np,sys,os,json
+          rel=pathlib.Path(os.environ['GITHUB_WORKSPACE'])/'out'/'release';sys.path.insert(0,str(rel));import gatea_actuator_r3_qrm as qrm
+          txt=(rel/'VALIDATION_GO.txt').read_text();got={}
+          for m,ones,h in re.findall(r'SELFTEST message=(\d+) ones=(\d+) sha256=([0-9a-f]{64})',txt):got[int(m)]=(int(ones),h)
+          c=qrm.QRM28()
+          for m in (0,1,0x0A5A5A5,0x0FFFFFFF):
+              b=c.encode_bits(m);packed=np.packbits(b,bitorder='big').tobytes();want=(int(b.sum()),hashlib.sha256(packed).hexdigest())
+              if got.get(m)!=want:raise SystemExit(f'Go/Python QRM mismatch m={m} got={got.get(m)} want={want}')
+          (rel/'VALIDATION_CROSS_LANGUAGE.json').write_text(json.dumps({'status':'PASS','messages':[0,1,0x0A5A5A5,0x0FFFFFFF],'claim':'Go actuator QRM encoding equals frozen Python evaluator QRM bit-for-bit for all preregistered cross-check vectors'},indent=2)+'\n')
+          print('CROSS_LANGUAGE_QRM_PASS=true')
+          PY
+
+          python3 - <<'PY'
+          import pathlib,hashlib,json,os,datetime,zipfile
+          rel=pathlib.Path(os.environ['GITHUB_WORKSPACE'])/'out'/'release'
+          code_names=['gatea_actuator_r3_qrm.py','gatea_actuator_r3_eval.py','gatea_actuator_r3_workload.go','fetch_gatea_actuator_r3_source.py','verify_gatea_actuator_r3_drand.go','go.mod','requirements.txt']
+          hashes={n:hashlib.sha256((rel/n).read_bytes()).hexdigest() for n in code_names};receiver_sha=hashlib.sha256((rel/'GATEA_ACTUATOR_R3_RECEIVER.bin').read_bytes()).hexdigest()
+          lock={'protocol':'ERCP-GATEA-ACTUATOR-R3-NIST-TO-DRAND-GITHUB-CPU-v1','created_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),'code_commit':os.environ['GITHUB_SHA'],'receiver_sha256':receiver_sha,'receiver':{'chain_index':2,'first_pulse':1931505,'last_pulse':1932016,'pulse_count':512,'field':'localRandomValue'},'future_source':{'chain_hash':'52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971','public_key':'83cf0f2896adee7eb8b5f01fcad3912212c437e0073e911fb90022d3e760183c8c4b450b6a0a6c3ac6a5776a2d1064510d1fec758c921cc22b0e17e63aaf4bcb5ed66304de9cf809bd274ca73bab4af5a6e9c76a4bc09e76eae8991ef5ece45a','scheme_id':'bls-unchained-g1-rfc9380','round':32032013,'utc':'2026-09-08T20:30:03Z','message_extraction':'randomness MSB bits 28..55 inclusive, interpreted as 28-bit unsigned integer'},'actuator':{'platform':'GitHub-hosted ubuntu-latest runner','codec':'QRM28 N=2^18','rounds_one':1024,'rounds_zero':16,'gomaxprocs':1,'max_start_lag_seconds':21600,'schedule_utc':'2026-09-08T20:40:00Z nominal; GitHub schedule may be delayed','validity':'must execute exactly once after source and within +6h, with successful four-relay and BLS gates'},'primary':{'score':'T(m)=sum_i (1-2*r_i)(1-2*C_m(i))','direction':'upper tail only','p':'exact count over all 2^28 QRM28 messages with T>=T_observed divided by 2^28, ties included','candidate_threshold':2.866515718791933e-7},'interpretation':{'valid_null':'NO_GATE_A_FUTURE_ACTUATOR_PAST_ANOMALY_IN_R3','valid_candidate':'GATE_A_FUTURE_ACTUATOR_PAST_CORRELATION_CANDIDATE_REQUIRES_INDEPENDENT_REPLICATION','invalid':'INVALID_INCONCLUSIVE if any receiver/source/BLS/actuation/code gate fails'},'r2_source_only_context':{'protocol':'ERCP-GATEA-BEACON-R2-PUBLIC-NIST-TO-DRAND-v1','message_block':'bits 0..27','receiver_pulses':'1932017..1932528','use':'orthogonal source-only comparison only; does not alter R3 primary endpoint'},'release_file_hashes':hashes}
+          (rel/'GATEA_ACTUATOR_R3_LOCK.json').write_text(json.dumps(lock,indent=2,sort_keys=True)+'\n')
+          (rel/'README.md').write_text('# ERCP Gate-A Actuator R3 prospective release\n\nFrozen before drand quicknet round 32032013 (2026-09-08T20:30:03Z). R3 tests an earlier NIST Randomness Beacon record against a later 28-bit message that is physically enacted as a sequential CPU workload on a GitHub-hosted runner. It is not a signalling or controllability demonstration. A candidate requires independent replication; any failed integrity or actuator prerequisite makes the trial INVALID / INCONCLUSIVE.\n')
+          manifest={}
+          for p in sorted(rel.rglob('*')):
+              if p.is_file() and p.name!='GATEA_ACTUATOR_R3_MANIFEST.json':manifest[p.relative_to(rel).as_posix()]=hashlib.sha256(p.read_bytes()).hexdigest()
+          (rel/'GATEA_ACTUATOR_R3_MANIFEST.json').write_text(json.dumps({'files':manifest},indent=2,sort_keys=True)+'\n')
+          out=rel.parent/'ERCP_GATEA_ACTUATOR_R3_PROSPECTIVE_RELEASE_2026-09-08.zip'
+          with zipfile.ZipFile(out,'w',compression=zipfile.ZIP_DEFLATED,compresslevel=9) as z:
+              for p in sorted(rel.rglob('*')):
+                  if p.is_file():
+                      info=zipfile.ZipInfo(p.relative_to(rel).as_posix(),date_time=(1980,1,1,0,0,0));info.compress_type=zipfile.ZIP_DEFLATED;info.external_attr=(0o644&0xffff)<<16;z.writestr(info,p.read_bytes(),compress_type=zipfile.ZIP_DEFLATED,compresslevel=9)
+          sha=hashlib.sha256(out.read_bytes()).hexdigest();(rel.parent/'RELEASE_SHA256.txt').write_text(f'{sha}  {out.name}\n')
+          print('R3_RELEASE_SHA256='+sha);print('R3_CODE_COMMIT='+os.environ['GITHUB_SHA']);print('R3_RECEIVER_SHA256='+receiver_sha)
+          PY
+
+      - name: Upload prospective release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gatea-actuator-r3-prospective-release
+          path: |
+            out/ERCP_GATEA_ACTUATOR_R3_PROSPECTIVE_RELEASE_2026-09-08.zip
+            out/RELEASE_SHA256.txt
+          if-no-files-found: error
+          compression-level: 0
