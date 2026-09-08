@@ -1,0 +1,99 @@
+name: Gate-A R1 post-source drand audit
+
+on:
+  push:
+    paths:
+      - '.github/workflows/gatea-r1-postsource-audit.yml'
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Fetch pinned quicknet round from four relays
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/fetch.py <<'PY'
+          import hashlib, json, urllib.request
+          from datetime import datetime, timezone
+
+          CHAIN='52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971'
+          PUBLIC_KEY='83cf0f2896adee7eb8b5f01fcad3912212c437e0073e911fb90022d3e760183c8c4b450b6a0a6c3ac6a5776a2d1064510d1fec758c921cc22b0e17e63aaf4bcb5ed66304de9cf809bd274ca73bab4af5a6e9c76a4bc09e76eae8991ef5ece45a'
+          SCHEME='bls-unchained-g1-rfc9380'
+          GENESIS=1692803367
+          PERIOD=3
+          ROUND=32003213
+          RELAYS=('https://api.drand.sh','https://api2.drand.sh','https://api3.drand.sh','https://drand.cloudflare.com')
+          rows=[]
+          for base in RELAYS:
+              url=f'{base}/{CHAIN}/public/{ROUND}'
+              req=urllib.request.Request(url,headers={'User-Agent':'ERCP-GateA-R1/1.0'})
+              with urllib.request.urlopen(req,timeout=30) as r:
+                  x=json.loads(r.read().decode())
+              row={'url':base,'round':int(x['round']),'signature':x['signature'],'randomness':x['randomness']}
+              assert row['round']==ROUND
+              assert hashlib.sha256(bytes.fromhex(row['signature'])).hexdigest()==row['randomness']
+              rows.append(row)
+          tuples={(r['round'],r['signature'],r['randomness']) for r in rows}
+          if len(tuples)!=1:
+              raise SystemExit('four-relay exact agreement failed')
+          rr,sig,randomness=next(iter(tuples))
+          out={'protocol':'ERCP-GATEA-R1-drand-source-v1','fetched_utc':datetime.now(timezone.utc).isoformat(),'chain_hash':CHAIN,'public_key':PUBLIC_KEY,'scheme_id':SCHEME,'genesis_time':GENESIS,'period_seconds':PERIOD,'round':rr,'round_unix':GENESIS+(rr-1)*PERIOD,'signature':sig,'randomness':randomness,'relays':rows,'four_relay_exact_agreement':True,'signature_to_randomness_sha256_verified':True}
+          open('/tmp/GATEA_R1_SOURCE.json','w').write(json.dumps(out,indent=2,sort_keys=True)+'\n')
+          print('SOURCE_JSON_BEGIN')
+          print(json.dumps(out,indent=2,sort_keys=True))
+          print('SOURCE_JSON_END')
+          PY
+          python /tmp/fetch.py
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.26.4'
+
+      - name: Verify preserved source with drand v2.1.7
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/gatea-r1-bls && mkdir /tmp/gatea-r1-bls && cd /tmp/gatea-r1-bls
+          go mod init gatea-r1-bls
+          go get github.com/drand/drand/v2/crypto@v2.1.7
+          cat > main.go <<'EOF'
+          package main
+          import (
+              "bytes"
+              "encoding/hex"
+              "encoding/json"
+              "fmt"
+              "os"
+              drandcrypto "github.com/drand/drand/v2/crypto"
+          )
+          type Source struct { ChainHash string `json:"chain_hash"`; PublicKey string `json:"public_key"`; SchemeID string `json:"scheme_id"`; Round uint64 `json:"round"`; Signature string `json:"signature"`; Randomness string `json:"randomness"` }
+          type Beacon struct { round uint64; sig []byte }
+          func (b *Beacon) GetPreviousSignature() []byte { return nil }
+          func (b *Beacon) GetRound() uint64 { return b.round }
+          func (b *Beacon) GetSignature() []byte { return b.sig }
+          func mustHex(s string) []byte { b,e:=hex.DecodeString(s); if e!=nil { panic(e) }; return b }
+          func main(){
+              raw,err:=os.ReadFile("/tmp/GATEA_R1_SOURCE.json"); if err!=nil { panic(err) }
+              var s Source; if err=json.Unmarshal(raw,&s); err!=nil { panic(err) }
+              if s.Round!=32003213 { panic("round mismatch") }
+              scheme:=drandcrypto.NewPedersenBLSUnchainedG1()
+              if s.SchemeID!=drandcrypto.SigsOnG1ID || scheme.Name!=drandcrypto.SigsOnG1ID { panic("scheme mismatch") }
+              pub:=scheme.KeyGroup.Point(); if err:=pub.UnmarshalBinary(mustHex(s.PublicKey)); err!=nil { panic(err) }
+              sig:=mustHex(s.Signature); got:=drandcrypto.RandomnessFromSignature(sig); want:=mustHex(s.Randomness)
+              if !bytes.Equal(got,want) { panic("randomness mismatch") }
+              if err:=scheme.VerifyBeacon(&Beacon{round:s.Round,sig:sig},pub); err!=nil { panic(err) }
+              ev:=map[string]any{"bls_verified":true,"round":s.Round,"signature":s.Signature,"randomness":s.Randomness,"public_key":s.PublicKey,"scheme_id":s.SchemeID,"drand_version":"v2.1.7"}
+              out,_:=json.MarshalIndent(ev,"","  "); os.WriteFile("/tmp/GATEA_R1_BLS.json",append(out,'\n'),0644)
+              fmt.Printf("BLS_VERIFIED=true ROUND=%d SCHEME=%s RANDOMNESS=%s\n",s.Round,s.SchemeID,s.Randomness)
+              fmt.Println("BLS_JSON_BEGIN"); fmt.Println(string(out)); fmt.Println("BLS_JSON_END")
+          }
+          EOF
+          go run .
