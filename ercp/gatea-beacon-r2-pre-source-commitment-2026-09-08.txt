@@ -1,0 +1,62 @@
+ERCP Gate-A Beacon R2 — PRE-SOURCE COMMITMENT
+Date: 2026-09-08
+Protocol: ERCP-GATEA-BEACON-R2-PUBLIC-NIST-TO-DRAND-v1
+
+SCIENTIFIC SCOPE
+Prospective source-only Gate-A existence screen using an externally timestamped NIST Randomness Beacon past receiver and a later drand quicknet source. No controllability, actuator, signalling, or Eurojackpot payload claim.
+
+EARLIER RECEIVER (FROZEN)
+Official NIST Randomness Beacon 2.0 API
+chainIndex = 2
+pulseIndex range = 1932017..1932528 inclusive (512 pulses)
+field = localRandomValue only
+concatenation = ascending pulseIndex; decode each 128-hex-character value to 64 bytes; concatenate; MSB-first bits
+receiver length = 262144 bits
+last selected pulse URI = https://beacon.nist.gov/beacon/2.0/chain/2/pulse/1932528
+last selected pulse timestamp = 2026-09-08T14:22:00.000Z
+last selected localRandomValue = 7164B8B7ABA409974D9A3DF1461F16FF34D5FD4F474A624DC3E8843359A1BC7351284C211CE6DF576D09C21C7ED1A872BBD651191602513DE087A0687790ABB8
+last selected certificateId = 87f27f431da3f584af6007fe045df13aaa81d831f335b6ee73f6334768f32d3ae10491e669b93a43e548b20370a6526c3def99643c25d8ad7bf5df95a3c2b45d
+No receiver range/field substitution is allowed after this commitment.
+
+LATER SOURCE (FROZEN)
+drand quicknet
+chain hash = 52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971
+scheme = bls-unchained-g1-rfc9380
+round = 32032013
+round UTC = 2026-09-08T20:30:03Z
+message = first 28 most-significant bits of verified 32-byte randomness
+No source substitution is allowed.
+
+PRIMARY ANALYSIS (FROZEN)
+Codec = frozen GF(512) QRM28, N=2^18, 28-bit message space.
+Coordinate mapping = direct receiver bit order; no post-source routing/permutation.
+Score T(m)=sum_i (1-2*r_i)*(1-2*C_m(i)).
+Primary p = number of all 2^28 messages with T >= T_observed divided by 2^28, ties included, one-sided.
+One primary test only.
+Strong-candidate threshold = 2.866515718791933e-7 (one-sided 5 sigma).
+The receiver distribution is unrestricted/conditioned on as fixed; the randomization is over the later 28-bit drand message assignment.
+
+INTEGRITY
+NIST fetch must preserve the complete official pulse JSONs and exact selected field/range.
+drand must agree exactly across four pinned relays, satisfy SHA256(signature)=randomness, and pass BLS VerifyBeacon using drand v2.1.7.
+Any frozen-code, receiver-selection, source-selection, direction, codec, or statistic change invalidates the confirmatory trial.
+
+INTERPRETATION
+Valid p > threshold => NO_GATE_A_PUBLIC_BEACON_PAST_ANOMALY_IN_R2.
+Valid p <= threshold => GATE_A_PUBLIC_BEACON_PAST_CORRELATION_CANDIDATE_REQUIRES_INDEPENDENT_REPLICATION.
+A candidate is not proof of time travel. A null is not a general theorem against retrocausality; this is an encoding-specific Gate-A screen.
+
+PRESERVED RELEASE HASHES
+prospective release ZIP SHA256 = 27556994a0a079f5d9ccb953e273910b349085360a1d2a2c1cc7805489b2f3c5
+lock SHA256 = 1684e42b77623858cf4eaf094c48ce21aa97d9ef9ddf01f5fd50e218084be4f1
+manifest SHA256 = 01132f30155efc58b49a2c258b0038157a4ac2f4d12582c6ac7e41284638e148
+evaluator SHA256 = 437e95f959778e0a5d184d97bb3af928fdb65eeda6a0e75df11a740d7704a442
+QRM SHA256 = 719d7e56345fc1447d15ed1740aa74866f20b73daf41927509a87865f6dc83fc
+NIST receiver fetcher SHA256 = 77298a3cc4a7906f3dedced1b1daa856c284909bc3ff89247417049c450b8803
+drand source fetcher SHA256 = d24dd12ebc6aeb31ef2e334a361baf66f7aed12608db374b656622f1150392bc
+BLS verifier SHA256 = bb26dc6f659da07ce14da9915da7f1a6d07cb48d58d0956f0af9be0c2880e24e
+
+PRE-SOURCE VALIDATION
+Numba integer FWHT matched frozen NumPy FWHT exactly at N=8, 256, 262144.
+Direct target dot score matched FWHT score for deterministic random receiver/message.
+Perfect-codeword self-test: observed score=262144, tail_count_ge=1, message_space=2^28, exact p=2^-28=3.725290298461914e-09.
