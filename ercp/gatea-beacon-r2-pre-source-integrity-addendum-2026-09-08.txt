@@ -1,0 +1,33 @@
+ERCP Gate-A Beacon R2 — PRE-SOURCE INTEGRITY ADDENDUM
+Date: 2026-09-08
+Protocol: ERCP-GATEA-BEACON-R2-PRESOURCE-INTEGRITY-ADDENDUM-v1
+
+WHY THIS EXISTS
+Adversarial audit of the already-published R2 commitment found one hardening gap: the original lock included a pre-source NIST last-pulse anchor, but the original evaluator did not itself force a machine check of that anchor. The original release and commitment remain unchanged. This addendum was created before the pinned future drand source and adds fail-closed provenance checks only.
+
+ORIGINAL IMMUTABLE REFERENCES
+original prospective release ZIP SHA256 = 27556994a0a079f5d9ccb953e273910b349085360a1d2a2c1cc7805489b2f3c5
+original lock SHA256 = 1684e42b77623858cf4eaf094c48ce21aa97d9ef9ddf01f5fd50e218084be4f1
+original target = drand quicknet round 32032013 at 2026-09-08T20:30:03Z
+
+NEW MANDATORY RECEIVER-INTEGRITY CHECKS
+- original frozen lock hash must match;
+- exactly 512 official NIST pulse JSON records must be present for chain 2, indices 1932017..1932528;
+- each statusCode must be 0 and each frozen localRandomValue must decode to 512 bits;
+- concatenated localRandomValue bytes must exactly equal the saved receiver bytes;
+- receiver metadata must match frozen chain/index/range/field selection;
+- all receiver timestamps must precede the pinned future source and be strictly increasing;
+- exposed previous-pulse URIs must point to the immediately preceding frozen index;
+- the last pulse URI, timestamp, localRandomValue and certificateId must exactly match the pre-source anchor already present in the original lock.
+
+NO SCIENTIFIC ENDPOINT CHANGE
+This addendum does NOT change the receiver range, field, bit order, target round, 28-bit mapping, QRM code, coordinate mapping, score, direction, p-value rule, 5-sigma threshold or interpretation. After the integrity checker produces PASS, the hardened wrapper invokes the original frozen evaluator unchanged.
+
+ADDENDUM HASHES
+addendum ZIP SHA256 = 57029dea32fa1735a1492e4903c1f7b8c3085fe265fc9c257137813ffdcdb18a
+integrity checker SHA256 = 338c3f32da05eddebc921d95f2959dc077125b4e38ef30de9e18cbfcbe3fa3ea
+hardened evaluator wrapper SHA256 = 3c1aefc429ae40f4799c7f44c656132482f664d9b6789b8ef34c4af408751e3a
+addendum manifest SHA256 = a66c8e84161c5011422f430514dc4ce3f50f103fe8e68c7e59af5a27a8e75f8f
+
+PRE-SOURCE VALIDATION
+A synthetic 512-pulse receiver with the exact frozen last-pulse anchor passed all addendum checks, including 511 previous-URI checks, exact byte reconstruction, strictly increasing timestamps and all-receiver-before-future-source timing.
