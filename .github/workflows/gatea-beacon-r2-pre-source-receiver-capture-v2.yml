@@ -1,0 +1,151 @@
+name: Gate-A Beacon R2 pre-source receiver capture v2
+
+on:
+  push:
+    paths:
+      - '.github/workflows/gatea-beacon-r2-pre-source-receiver-capture-v2.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Capture exact NIST receiver bytes before future drand source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p capture/pulses
+          python3 - <<'PY'
+          import urllib.request, json, hashlib, time, pathlib, datetime
+          from concurrent.futures import ThreadPoolExecutor, as_completed
+
+          CHAIN=2
+          START=1932017
+          END=1932528
+          TARGET='2026-09-08T20:30:03.000Z'
+          LAST_TS='2026-09-08T14:22:00.000Z'
+          LAST_LRV='7164B8B7ABA409974D9A3DF1461F16FF34D5FD4F474A624DC3E8843359A1BC7351284C211CE6DF576D09C21C7ED1A872BBD651191602513DE087A0687790ABB8'
+          LAST_CERT='87f27f431da3f584af6007fe045df13aaa81d831f335b6ee73f6334768f32d3ae10491e669b93a43e548b20370a6526c3def99643c25d8ad7bf5df95a3c2b45d'
+          ROOT=pathlib.Path('capture')
+
+          def parse_ts(s):
+              if not s.endswith('Z'):
+                  raise ValueError(f'non-Z timestamp {s}')
+              return datetime.datetime.fromisoformat(s[:-1] + '+00:00')
+
+          target_dt=parse_ts(TARGET)
+
+          def fetch_one(idx):
+              url=f'https://beacon.nist.gov/beacon/2.0/chain/{CHAIN}/pulse/{idx}'
+              last=None
+              for attempt in range(8):
+                  try:
+                      req=urllib.request.Request(url,headers={'User-Agent':'ERCP-GateA-Beacon-R2-presource-capture-v2/1.0'})
+                      with urllib.request.urlopen(req,timeout=30) as r:
+                          raw=r.read()
+                      obj=json.loads(raw)
+                      if set(obj.keys()) != {'pulse'}:
+                          raise RuntimeError(f'{idx}: top-level keys {sorted(obj.keys())}')
+                      p=obj['pulse']
+                      if int(p['chainIndex'])!=CHAIN or int(p['pulseIndex'])!=idx:
+                          raise RuntimeError(f'{idx}: identity mismatch')
+                      if int(p.get('statusCode',-1))!=0:
+                          raise RuntimeError(f'{idx}: statusCode {p.get("statusCode")}')
+                      lrv=str(p['localRandomValue'])
+                      if len(lrv)!=128 or len(bytes.fromhex(lrv))!=64:
+                          raise RuntimeError(f'{idx}: localRandomValue malformed')
+                      if parse_ts(p['timeStamp']) >= target_dt:
+                          raise RuntimeError(f'{idx}: pulse not before future source')
+                      return idx,raw,obj
+                  except Exception as e:
+                      last=e
+                      time.sleep(min(0.5*(2**attempt),10))
+              raise RuntimeError(f'fetch failed {idx}: {last}')
+
+          results={}
+          with ThreadPoolExecutor(max_workers=8) as ex:
+              futs=[ex.submit(fetch_one,i) for i in range(START,END+1)]
+              for fut in as_completed(futs):
+                  idx,raw,obj=fut.result()
+                  results[idx]=(raw,obj)
+
+          receiver=bytearray()
+          records=[]
+          timestamps=[]
+          for idx in range(START,END+1):
+              raw,obj=results[idx]
+              (ROOT/'pulses'/f'{idx}.json').write_bytes(raw)
+              p=obj['pulse']
+              receiver.extend(bytes.fromhex(p['localRandomValue']))
+              timestamps.append(parse_ts(p['timeStamp']))
+              records.append({
+                  'chainIndex':int(p['chainIndex']),
+                  'pulseIndex':int(p['pulseIndex']),
+                  'timeStamp':p['timeStamp'],
+                  'localRandomValue':p['localRandomValue'],
+                  'certificateId':p.get('certificateId'),
+                  'signatureValue':p.get('signatureValue'),
+                  'outputValue':p.get('outputValue'),
+                  'listValues':p.get('listValues'),
+                  'uri':p.get('uri'),
+                  'raw_sha256':hashlib.sha256(raw).hexdigest(),
+              })
+
+          if any(timestamps[i] >= timestamps[i+1] for i in range(len(timestamps)-1)):
+              raise SystemExit('timestamps not strictly increasing')
+          if len(receiver)!=32768:
+              raise SystemExit(f'receiver length {len(receiver)}')
+          last=records[-1]
+          if last['timeStamp']!=LAST_TS or last['localRandomValue']!=LAST_LRV or last['certificateId']!=LAST_CERT:
+              raise SystemExit('last-pulse anchor mismatch')
+
+          (ROOT/'receiver.bin').write_bytes(receiver)
+          with (ROOT/'receiver_records.jsonl').open('w',encoding='utf-8') as f:
+              for r in records:
+                  f.write(json.dumps(r,sort_keys=True,separators=(',',':'))+'\n')
+
+          meta={
+              'protocol':'ERCP-GATEA-BEACON-R2-PRESOURCE-NIST-CAPTURE-v2',
+              'captured_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),
+              'official_base':'https://beacon.nist.gov/beacon/2.0',
+              'chain_index':CHAIN,
+              'first_pulse':START,
+              'last_pulse':END,
+              'pulse_count':END-START+1,
+              'receiver_field':'localRandomValue',
+              'receiver_bytes':len(receiver),
+              'receiver_bits':len(receiver)*8,
+              'receiver_sha256':hashlib.sha256(receiver).hexdigest(),
+              'receiver_records_jsonl_sha256':hashlib.sha256((ROOT/'receiver_records.jsonl').read_bytes()).hexdigest(),
+              'first_timestamp':records[0]['timeStamp'],
+              'last_timestamp':records[-1]['timeStamp'],
+              'last_pulse_anchor_verified':True,
+              'strictly_increasing_timestamps':True,
+              'all_pulses_before_future_source':True,
+              'future_source_round':32032013,
+              'future_source_utc':'2026-09-08T20:30:03Z',
+          }
+          (ROOT/'receiver_meta.json').write_text(json.dumps(meta,indent=2,sort_keys=True)+'\n',encoding='utf-8')
+
+          entries=[]
+          for p in sorted(ROOT.rglob('*')):
+              if p.is_file() and p.name!='SHA256SUMS.txt':
+                  entries.append((hashlib.sha256(p.read_bytes()).hexdigest(),p.relative_to(ROOT).as_posix()))
+          (ROOT/'SHA256SUMS.txt').write_text(''.join(f'{h}  {name}\n' for h,name in entries),encoding='utf-8')
+          print(json.dumps(meta,indent=2,sort_keys=True))
+          print('CAPTURE_PASS=true')
+          PY
+
+          sha256sum capture/receiver.bin capture/receiver_records.jsonl capture/receiver_meta.json capture/SHA256SUMS.txt
+
+      - name: Upload immutable receiver snapshot artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gatea-beacon-r2-pre-source-nist-receiver-v2
+          path: capture/
+          if-no-files-found: error
+          compression-level: 9
