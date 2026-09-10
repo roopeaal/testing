@@ -64,6 +64,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p /tmp/out
+          cp "$GITHUB_WORKSPACE/out/R2_DRAND_SOURCE.json" /tmp/out/R2_DRAND_SOURCE.json
           cat > /tmp/go.mod <<'EOF'
           module ercp-r2-postsource
           go 1.23
@@ -105,7 +107,7 @@ jobs:
           cd /tmp
           go mod tidy
           go run verify.go
-          cp /tmp/out/R2_BLS_EVIDENCE.json "$GITHUB_WORKSPACE/out/R2_BLS_EVIDENCE.json" 2>/dev/null || true
+          cp /tmp/out/R2_BLS_EVIDENCE.json "$GITHUB_WORKSPACE/out/R2_BLS_EVIDENCE.json"
 
       - name: Hash source artifacts
         shell: bash
@@ -116,7 +118,7 @@ jobs:
       - name: Upload source and BLS evidence
         uses: actions/upload-artifact@v4
         with:
-          name: gatea-beacon-r2-postsource-source-bls
+          name: gatea-beacon-r2-postsource-source-bls-v2
           path: out/
           if-no-files-found: error
           compression-level: 9
