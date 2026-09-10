@@ -1,0 +1,122 @@
+name: Gate-A Beacon R2 post-source source+BLS
+
+on:
+  push:
+    paths:
+      - '.github/workflows/gatea-beacon-r2-postsource-source-bls.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Fetch exact frozen drand source from four relays
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          cat > /tmp/fetch.py <<'PY'
+          import json, hashlib, urllib.request, time
+          from datetime import datetime, timezone
+          from pathlib import Path
+          CHAIN='52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971'
+          PUBLIC_KEY='83cf0f2896adee7eb8b5f01fcad3912212c437e0073e911fb90022d3e760183c8c4b450b6a0a6c3ac6a5776a2d1064510d1fec758c921cc22b0e17e63aaf4bcb5ed66304de9cf809bd274ca73bab4af5a6e9c76a4bc09e76eae8991ef5ece45a'
+          SCHEME='bls-unchained-g1-rfc9380'
+          GENESIS=1692803367
+          PERIOD=3
+          ROUND=32032013
+          RELAYS=('https://api.drand.sh','https://api2.drand.sh','https://api3.drand.sh','https://drand.cloudflare.com')
+          rows=[]
+          for base in RELAYS:
+              url=f'{base}/{CHAIN}/public/{ROUND}'
+              last=None
+              for attempt in range(5):
+                  try:
+                      req=urllib.request.Request(url,headers={'User-Agent':'ERCP-GateA-Beacon-R2-postsource/1.0'})
+                      with urllib.request.urlopen(req,timeout=30) as r:
+                          x=json.loads(r.read().decode())
+                      break
+                  except Exception as e:
+                      last=e; time.sleep(2*(attempt+1))
+              else: raise last
+              row={'url':base,'round':int(x['round']),'signature':x['signature'],'randomness':x['randomness']}
+              if row['round']!=ROUND: raise SystemExit(f'round mismatch {base}')
+              if hashlib.sha256(bytes.fromhex(row['signature'])).hexdigest()!=row['randomness']:
+                  raise SystemExit(f'signature/randomness mismatch {base}')
+              rows.append(row)
+          tuples={(r['round'],r['signature'],r['randomness']) for r in rows}
+          if len(tuples)!=1: raise SystemExit('four-relay exact agreement failed')
+          rr,sig,rnd=next(iter(tuples))
+          out={'protocol':'ERCP-GATEA-BEACON-R2-drand-source-v1','fetched_utc':datetime.now(timezone.utc).isoformat(),
+               'chain_hash':CHAIN,'public_key':PUBLIC_KEY,'scheme_id':SCHEME,'genesis_time':GENESIS,'period_seconds':PERIOD,
+               'round':rr,'round_unix':GENESIS+(rr-1)*PERIOD,'signature':sig,'randomness':rnd,'relays':rows,
+               'four_relay_exact_agreement':True,'signature_to_randomness_sha256_verified':True}
+          Path('out/R2_DRAND_SOURCE.json').write_text(json.dumps(out,indent=2,sort_keys=True)+'\n')
+          print(json.dumps(out,indent=2,sort_keys=True))
+          PY
+          python /tmp/fetch.py
+
+      - name: Verify exact BLS beacon with drand v2.1.7
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/go.mod <<'EOF'
+          module ercp-r2-postsource
+          go 1.23
+          require github.com/drand/drand/v2 v2.1.7
+          EOF
+          cat > /tmp/verify.go <<'GO'
+          package main
+          import (
+            "bytes"
+            "encoding/hex"
+            "encoding/json"
+            "fmt"
+            "os"
+            drandcrypto "github.com/drand/drand/v2/crypto"
+          )
+          type Source struct { ChainHash string `json:"chain_hash"`; PublicKey string `json:"public_key"`; SchemeID string `json:"scheme_id"`; Round uint64 `json:"round"`; Signature string `json:"signature"`; Randomness string `json:"randomness"` }
+          type Beacon struct { round uint64; sig []byte }
+          func (b *Beacon) GetPreviousSignature() []byte { return nil }
+          func (b *Beacon) GetRound() uint64 { return b.round }
+          func (b *Beacon) GetSignature() []byte { return b.sig }
+          type Evidence struct { BLSVerified bool `json:"bls_verified"`; Round uint64 `json:"round"`; Signature string `json:"signature"`; Randomness string `json:"randomness"`; PublicKey string `json:"public_key"`; SchemeID string `json:"scheme_id"`; DrandVersion string `json:"drand_version"` }
+          func mustHex(s string) []byte { b,e:=hex.DecodeString(s); if e!=nil { panic(e) }; return b }
+          func main(){
+            raw,err:=os.ReadFile("out/R2_DRAND_SOURCE.json"); if err!=nil { panic(err) }
+            var s Source; if err=json.Unmarshal(raw,&s); err!=nil { panic(err) }
+            if s.Round!=32032013 { panic("wrong round") }
+            scheme:=drandcrypto.NewPedersenBLSUnchainedG1()
+            if s.SchemeID!=drandcrypto.SigsOnG1ID || scheme.Name!=drandcrypto.SigsOnG1ID { panic("scheme mismatch") }
+            pub:=scheme.KeyGroup.Point(); if err:=pub.UnmarshalBinary(mustHex(s.PublicKey)); err!=nil { panic(err) }
+            sig:=mustHex(s.Signature); got:=drandcrypto.RandomnessFromSignature(sig); want:=mustHex(s.Randomness)
+            if !bytes.Equal(got,want) { panic("randomness mismatch") }
+            if err:=scheme.VerifyBeacon(&Beacon{round:s.Round,sig:sig},pub); err!=nil { panic(err) }
+            ev:=Evidence{true,s.Round,s.Signature,s.Randomness,s.PublicKey,s.SchemeID,"v2.1.7"}
+            out,_:=json.MarshalIndent(ev,"","  "); out=append(out,'\n')
+            if err:=os.WriteFile("out/R2_BLS_EVIDENCE.json",out,0644); err!=nil { panic(err) }
+            fmt.Printf("BLS_VERIFIED=true ROUND=%d RANDOMNESS=%s\n",s.Round,s.Randomness)
+          }
+          GO
+          cd /tmp
+          go mod tidy
+          go run verify.go
+          cp /tmp/out/R2_BLS_EVIDENCE.json "$GITHUB_WORKSPACE/out/R2_BLS_EVIDENCE.json" 2>/dev/null || true
+
+      - name: Hash source artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum out/R2_DRAND_SOURCE.json out/R2_BLS_EVIDENCE.json | tee out/SHA256SUMS.txt
+
+      - name: Upload source and BLS evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: gatea-beacon-r2-postsource-source-bls
+          path: out/
+          if-no-files-found: error
+          compression-level: 9
