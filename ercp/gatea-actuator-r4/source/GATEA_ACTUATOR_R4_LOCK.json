@@ -1,0 +1,113 @@
+{
+  "actuator": {
+    "GOMAXPROCS": 1,
+    "active_seed": "R4ACTIVE| || target_bit || original 64-byte cell",
+    "active_target_one_sha256_rounds": 1024,
+    "active_target_zero_sha256_rounds": 16,
+    "assignment_codeword": "A=C_assignment using frozen QRM28; A=1 active, A=0 sham",
+    "memory_write": "write final 32-byte digest into first 32 bytes of same mmap cell",
+    "no_rerun": "only GITHUB_RUN_ATTEMPT=1 is scientifically valid; a failed/cancelled attempt is INVALID/INCONCLUSIVE and must not be salvaged by rerun",
+    "sham_seed": "R4SHAM|\\x00 || original 64-byte cell; independent of target bit",
+    "sham_sha256_rounds": 520,
+    "start_window": "assignment UTC through assignment UTC +600 seconds",
+    "substrate": "exact same 16 MiB file; SHA256 must equal pre-source substrate hash immediately before actuation",
+    "symmetric_contrast_rounds": 504,
+    "target_codeword": "X=C_target using frozen QRM28"
+  },
+  "epistemic_scope": "A candidate is not proof of time travel and does not establish controllable signalling. A null constrains this specific same-runner randomized actuator design.",
+  "forbidden": [
+    "postselection",
+    "rerunning a failed trial as if confirmatory",
+    "changing target/assignment round",
+    "changing receiver transform after source",
+    "label-dependent preprocessing",
+    "zero-phase/filtfilt preprocessing",
+    "backdating or retrospective message editing as evidence"
+  ],
+  "future_sources": {
+    "assignment": {
+      "message": "first 28 MSBs of verified randomness",
+      "round": 32094613,
+      "utc": "2026-09-11T00:40:03Z"
+    },
+    "chain_hash": "52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971",
+    "drand_version_for_bls": "v2.1.7",
+    "no_source_fetch_before_assignment": "workflow contains no drand source fetch before the frozen wait ends at/after assignment UTC",
+    "relays": [
+      "https://api.drand.sh",
+      "https://api2.drand.sh",
+      "https://api3.drand.sh",
+      "https://drand.cloudflare.com"
+    ],
+    "scheme_id": "bls-unchained-g1-rfc9380",
+    "source_requirements": [
+      "exact four-relay agreement",
+      "SHA256(signature)=randomness",
+      "BLS VerifyBeacon PASS"
+    ],
+    "target": {
+      "message": "first 28 MSBs of verified randomness",
+      "round": 32094413,
+      "utc": "2026-09-11T00:30:03Z"
+    }
+  },
+  "lock_created_utc": "2026-09-10T22:25:33.764525+00:00",
+  "primary_analysis": {
+    "candidate_interpretation": "GATE_A_LOCAL_FUTURE_ACTUATOR_INTERACTION_CANDIDATE_REQUIRES_INDEPENDENT_REPLICATION",
+    "conditioning": "condition on frozen earlier receiver z and realized future target X; randomize exactly over all 2^28 frozen QRM28 assignment messages",
+    "evaluator_mapping": "because exact_tail scores (1-2*C_m), evaluate assignment message m_A xor 1 to represent (2*A-1)",
+    "null_interpretation": "NO_GATE_A_LOCAL_FUTURE_ACTUATOR_INTERACTION_IN_R4",
+    "one_primary_test": true,
+    "p_value": "tail_count_ge/2^28, one-sided, ties included",
+    "secondary_diagnostics": [
+      "target source-main exact QRM28 test",
+      "assignment main-effect exact QRM28 test"
+    ],
+    "statistic": "D=sum_i z_i*(2*X_i-1)*(2*A_i-1)",
+    "threshold": 2.866515718791933e-07
+  },
+  "protocol": "ERCP-GATEA-ACTUATOR-R4-SAME-RUNNER-RANDOMIZED-MMAP-v1",
+  "purpose": "Prospective Gate-A-with-attribution screen for a later randomized physical CPU+memory intervention on the same GitHub-hosted runner and same persistent mmap file used by the earlier timing receiver.",
+  "receiver": {
+    "N": 262144,
+    "bit_reversal_requirement": "must be a bijection/involution over all 2^18 coordinates; capture code fails closed if not a permutation",
+    "cell_bytes": 64,
+    "hard_receiver_rule": "bit=1 iff rank>=N/2",
+    "measurement": "per coordinate, read 64-byte cell then 8 sequential SHA256 operations; perf_counter_ns elapsed; fixed 18-bit bit-reversal traversal; raw result stored by coordinate index",
+    "must_finish_before_target_seconds": 1800,
+    "primary_weight_rule": "z_i=2*rank_i-(N-1)",
+    "rank_rule": "sort by (latency_ns,index); rank 0..N-1",
+    "raw_latency_dtype": "little-endian uint32 nanoseconds",
+    "same_runner_identity": [
+      "hostname",
+      "boot_id",
+      "github_run_id",
+      "github_run_attempt"
+    ],
+    "substrate_bytes": 16777216,
+    "substrate_generation": "SHAKE256(\"ERCP-GATEA-ACTUATOR-R4-SUBSTRATE-v1\") first 16 MiB",
+    "valid_github_run_attempt": "1"
+  },
+  "release_file_hashes": {
+    "README.md": "c60bbdf30f0ec859b501cb5fc52844ae3179cbfada643ebf5e0992594519cde4",
+    "actuate_r4.go": "42b694481c9c9a7e6a95fb0f35624810c631870e22bfa9be341cb0b1cbf43eeb",
+    "capture_r4.py": "418aff9dc513c94940e07c714e35436410bbb2ca5111d8d548407178f77832be",
+    "evaluate_r4.py": "01b30123da6d52eb0e308ecd044dcca86dae508f2bf420fca98a2ff4c2887f07",
+    "gatea_actuator_r4_qrm.py": "719d7e56345fc1447d15ed1740aa74866f20b73daf41927509a87865f6dc83fc",
+    "go.mod": "24ee6f880730822eb368d8ab408b9319e77804a16d113ab83a322a205826d533",
+    "requirements.txt": "45b4f0d51c9c7f631e004c8ee6971088b263b50adf867f3c66564b2856ec01f9"
+  },
+  "status": "PRESOURCE_DESIGN_LOCK",
+  "validity_gates": [
+    "all release file SHA256 values match this lock",
+    "Python evaluator selftest PASS before receiver capture",
+    "Go actuator builds before receiver capture and selftest codewords match frozen Python QRM28 vectors",
+    "pre-source receiver/latency/meta hashes are committed and uploaded before target UTC minus 30 minutes",
+    "same GitHub run id/attempt, hostname, and boot_id from receiver through actuation",
+    "substrate hash unchanged until actuation",
+    "both future sources pass exact relay/hash/BLS gates",
+    "actuator starts only after assignment source and within +600 seconds",
+    "all trial outputs retained",
+    "no post-source modification of receiver, statistic, direction, codec, source rounds, treatment mapping, or threshold"
+  ]
+}
