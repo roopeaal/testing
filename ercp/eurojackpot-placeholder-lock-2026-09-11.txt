@@ -1,0 +1,16 @@
+ERCP Eurojackpot placeholder pre-draw commitment
+
+Created before the next Eurojackpot result is known.
+
+Frozen placeholder row:
+6, 17, 28, 39, 46 + 3, 10
+
+SHA256(UTF-8 exact row string):
+7b4924982800627c614f534df265c1b5180e2c959a00b5418d5614b1391d8070
+
+Scientific interpretation rule:
+- A later ordinary edit, database rewrite, UI replacement, postselection, or recreation of this record does NOT count as future-to-past information transfer.
+- A genuine success would require independently auditable evidence that an objectively earlier immutable record contained the later official winning row without ordinary forward-time modification.
+- The original chat message containing the placeholder must be treated as fixed for scientific purposes.
+
+This file is an external chronological commitment only. It does not claim that retrocausal information transfer is possible.
