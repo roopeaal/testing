@@ -64,14 +64,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p /tmp/out
-          cp "$GITHUB_WORKSPACE/out/R2_DRAND_SOURCE.json" /tmp/out/R2_DRAND_SOURCE.json
-          cat > /tmp/go.mod <<'EOF'
+          WORK=/tmp/ercp-r2-bls
+          rm -rf "$WORK"
+          mkdir -p "$WORK/out"
+          cp "$GITHUB_WORKSPACE/out/R2_DRAND_SOURCE.json" "$WORK/out/R2_DRAND_SOURCE.json"
+          cat > "$WORK/go.mod" <<'EOF'
           module ercp-r2-postsource
           go 1.23
           require github.com/drand/drand/v2 v2.1.7
           EOF
-          cat > /tmp/verify.go <<'GO'
+          cat > "$WORK/verify.go" <<'GO'
           package main
           import (
             "bytes"
@@ -104,10 +106,10 @@ jobs:
             fmt.Printf("BLS_VERIFIED=true ROUND=%d RANDOMNESS=%s\n",s.Round,s.Randomness)
           }
           GO
-          cd /tmp
+          cd "$WORK"
           go mod tidy
           go run verify.go
-          cp /tmp/out/R2_BLS_EVIDENCE.json "$GITHUB_WORKSPACE/out/R2_BLS_EVIDENCE.json"
+          cp "$WORK/out/R2_BLS_EVIDENCE.json" "$GITHUB_WORKSPACE/out/R2_BLS_EVIDENCE.json"
 
       - name: Hash source artifacts
         shell: bash
@@ -118,7 +120,7 @@ jobs:
       - name: Upload source and BLS evidence
         uses: actions/upload-artifact@v4
         with:
-          name: gatea-beacon-r2-postsource-source-bls-v2
+          name: gatea-beacon-r2-postsource-source-bls-v3
           path: out/
           if-no-files-found: error
           compression-level: 9
