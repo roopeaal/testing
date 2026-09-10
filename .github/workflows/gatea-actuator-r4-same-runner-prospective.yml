@@ -1,0 +1,208 @@
+name: Gate-A Actuator R4 same-runner prospective
+
+on:
+  push:
+    paths:
+      - '.github/workflows/gatea-actuator-r4-same-runner-prospective.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  r4:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+    steps:
+      - name: Checkout trigger commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Reconstruct frozen release from trigger commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_RUN_ATTEMPT" = "1"
+          rm -rf release pre post build substrate.bin
+          mkdir -p release pre post build
+          cp ercp/gatea-actuator-r4/source/capture_r4.py release/capture_r4.py
+          cp ercp/gatea-actuator-r4/source/evaluate_r4.py release/evaluate_r4.py
+          cp ercp/gatea-actuator-r4/source/actuate_r4.go release/actuate_r4.go
+          cp ercp/gatea-actuator-r4/source/go.mod release/go.mod
+          cp ercp/gatea-actuator-r4/source/requirements.txt release/requirements.txt
+          cp ercp/gatea-actuator-r4/source/README.md release/README.md
+          cp ercp/gatea-actuator-r4/source/GATEA_ACTUATOR_R4_LOCK.json release/GATEA_ACTUATOR_R4_LOCK.json
+          cp ercp/gatea-actuator-r3/gatea_actuator_r3_qrm.py release/gatea_actuator_r4_qrm.py
+
+      - name: Verify frozen release hashes and time margin
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,hashlib,time,pathlib
+          r=pathlib.Path('release')
+          lock=json.loads((r/'GATEA_ACTUATOR_R4_LOCK.json').read_text())
+          assert lock['protocol']=='ERCP-GATEA-ACTUATOR-R4-SAME-RUNNER-RANDOMIZED-MMAP-v1'
+          for name,want in lock['release_file_hashes'].items():
+              got=hashlib.sha256((r/name).read_bytes()).hexdigest()
+              if got!=want: raise SystemExit(f'release hash {name}: {got} != {want}')
+          if time.time() >= 1789086603-1800: raise SystemExit('less than 30 min pre-target margin')
+          print('R4_RELEASE_HASH_GATE=PASS')
+          PY
+
+      - name: Install frozen Python dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check -r release/requirements.txt
+          python3 - <<'PY'
+          import numpy,numba
+          print('numpy',numpy.__version__,'numba',numba.__version__)
+          assert numpy.__version__=='2.3.5' and numba.__version__=='0.65.1'
+          PY
+
+      - name: Build actuator and run cross-language self-tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp release/go.mod release/actuate_r4.go build/
+          cd build
+          go mod tidy
+          go build -trimpath -o ../release/r4_actuator actuate_r4.go
+          cd ..
+          ./release/r4_actuator --mode selftest | tee go-selftest.txt
+          grep -F 'SELFTEST message=0 ones=0 sha256=c35020473aed1b4642cd726cad727b63fff2824ad68cedd7ffb73c7cbd890479' go-selftest.txt
+          grep -F 'SELFTEST message=1 ones=262144 sha256=2d864c0b789a43214eee8524d3182075125e5ca2cd527f3582ec87ffd94076bc' go-selftest.txt
+          grep -F 'SELFTEST message=10855845 ones=130816 sha256=f774e3816717fda655798cd43acf1b74c6f4ba71aac7ce8c9d141f8a87eb6f97' go-selftest.txt
+          grep -F 'SELFTEST message=268435455 ones=130816 sha256=37fba550811df5881906f848dec02aff5fbfb70630f1e2b2fef5cd0a40b25c7d' go-selftest.txt
+          grep -F 'R4_ACTUATOR_SELFTEST=PASS' go-selftest.txt
+          python3 release/evaluate_r4.py selftest | tee py-selftest.txt
+          grep -F '"selftest": "PASS"' py-selftest.txt
+          sha256sum release/r4_actuator build/go.sum > build/BINARY_AND_GOSUM_SHA256.txt
+
+      - name: Capture earlier same-substrate timing receiver
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 release/capture_r4.py --outdir pre --substrate substrate.bin | tee pre/R4_CAPTURE_STDOUT.txt
+          grep -F 'R4_CAPTURE_PASS=true' pre/R4_CAPTURE_STDOUT.txt
+
+      - name: Create frozen pre-source commitment
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,hashlib,time,datetime,os,pathlib
+          R=pathlib.Path('release'); P=pathlib.Path('pre')
+          def h(p): return hashlib.sha256(pathlib.Path(p).read_bytes()).hexdigest()
+          if time.time() >= 1789086603-1800: raise SystemExit('precommit margin <30 minutes')
+          if os.environ['GITHUB_RUN_ATTEMPT']!='1': raise SystemExit('attempt')
+          meta=json.loads((P/'R4_RECEIVER_META.json').read_text())
+          names=['R4_RECEIVER.bin','R4_LATENCIES_U32.bin','R4_LATENCIES_U32.bin.gz','R4_RECEIVER_META.json','R4_CAPTURE_STDOUT.txt']
+          release_names=['capture_r4.py','gatea_actuator_r4_qrm.py','actuate_r4.go','evaluate_r4.py','go.mod','requirements.txt','README.md','GATEA_ACTUATOR_R4_LOCK.json','r4_actuator']
+          c={
+            'protocol':'ERCP-GATEA-ACTUATOR-R4-PRESOURCE-COMMITMENT-v1',
+            'created_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            'workflow_trigger_sha':os.environ['GITHUB_SHA'],
+            'github_run_id':os.environ['GITHUB_RUN_ID'],
+            'github_run_attempt':os.environ['GITHUB_RUN_ATTEMPT'],
+            'target_round':32094413,'target_utc':'2026-09-11T00:30:03Z',
+            'assignment_round':32094613,'assignment_utc':'2026-09-11T00:40:03Z',
+            'statement':'Receiver and exact executable frozen before either future drand source; no source-fetch step occurs before post-assignment actuator.',
+            'file_sha256':{n:h(P/n) for n in names},
+            'release_sha256':{n:h(R/n) for n in release_names},
+            'actuator_binary_sha256':h(R/'r4_actuator'),
+            'go_sum_sha256':h('build/go.sum'),
+            'substrate_sha256':meta['substrate_sha256'],
+            'receiver_sha256':meta['receiver_sha256'],
+            'latencies_sha256':meta['latencies_sha256'],
+            'scientific_validity':'Only GITHUB_RUN_ATTEMPT=1 can be confirmatory; rerun after failure is invalid/inconclusive.'}
+          (P/'R4_PRE_SOURCE_COMMITMENT.json').write_text(json.dumps(c,indent=2,sort_keys=True)+'\n')
+          allfiles=sorted(x for x in P.iterdir() if x.is_file())+[R/'GATEA_ACTUATOR_R4_LOCK.json',R/'r4_actuator',pathlib.Path('build/go.sum')]
+          (P/'SHA256SUMS_PRE_FINAL.txt').write_text(''.join(f'{h(x)}  {x}\n' for x in allfiles))
+          print(json.dumps(c,indent=2,sort_keys=True))
+          PY
+
+      - name: Publish receiver and frozen code to Git before sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          D="ercp/gatea-actuator-r4/trials/${GITHUB_RUN_ID}/pre"
+          F="ercp/gatea-actuator-r4/frozen"
+          mkdir -p "$D" "$F"
+          cp pre/R4_RECEIVER.bin pre/R4_LATENCIES_U32.bin.gz pre/R4_RECEIVER_META.json pre/R4_PRE_SOURCE_COMMITMENT.json pre/SHA256SUMS_PRE_FINAL.txt "$D/"
+          cp release/capture_r4.py release/gatea_actuator_r4_qrm.py release/actuate_r4.go release/evaluate_r4.py release/go.mod release/requirements.txt release/README.md release/GATEA_ACTUATOR_R4_LOCK.json "$F/"
+          git config user.name 'ERCP R4 Prospective Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add "$D" "$F"
+          git commit -m 'Lock R4 same-runner receiver before future drand sources'
+          PRE_SHA=$(git rev-parse HEAD)
+          git push origin HEAD:main
+          printf '%s\n' "$PRE_SHA" | tee pre/PRE_GIT_COMMIT_SHA.txt
+          git show -s --format=fuller "$PRE_SHA" | tee pre/PRE_GIT_COMMIT.txt
+          python3 - <<'PY'
+          import time
+          if time.time() >= 1789086603-1800: raise SystemExit('Git precommit missed 30-minute target margin')
+          print('R4_EXTERNAL_GIT_PRESOURCE_COMMIT=PASS')
+          PY
+
+      - name: Upload immutable pre-source artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gatea-actuator-r4-pre-source-${{ github.run_id }}
+          path: |
+            pre/
+            release/
+            build/go.sum
+            build/BINARY_AND_GOSUM_SHA256.txt
+          if-no-files-found: error
+          compression-level: 9
+
+      - name: Wait without fetching future sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import time,datetime
+          T=1789087203
+          while True:
+              d=T-time.time()
+              if d<=0: break
+              if d>300: print('WAITING_FOR_FUTURE_ASSIGNMENT seconds_remaining=',int(d),flush=True)
+              time.sleep(min(60,max(1,d)))
+          print('ASSIGNMENT_TIME_REACHED',datetime.datetime.now(datetime.timezone.utc).isoformat(),flush=True)
+          PY
+
+      - name: Execute frozen future randomized physical actuator
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./release/r4_actuator --mode run --pre-dir pre --substrate substrate.bin --out-dir post | tee post/R4_ACTUATOR_STDOUT.txt
+
+      - name: Evaluate frozen exact randomized interaction
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 release/evaluate_r4.py evaluate --release-dir release --pre-dir pre --post-dir post --out post/R4_RESULT.json | tee post/R4_EVALUATOR_STDOUT.txt
+          cp substrate.bin post/R4_SUBSTRATE_POST.bin
+          cp pre/PRE_GIT_COMMIT_SHA.txt post/PRE_GIT_COMMIT_SHA.txt
+          sha256sum post/* > post/SHA256SUMS_POST.txt
+
+      - name: Upload immutable post-source artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gatea-actuator-r4-post-source-${{ github.run_id }}
+          path: post/
+          if-no-files-found: error
+          compression-level: 9
+
+      - name: Preserve post-source result in Git
+        shell: bash
+        run: |
+          set -euo pipefail
+          D="ercp/gatea-actuator-r4/trials/${GITHUB_RUN_ID}/post"
+          mkdir -p "$D"
+          cp post/R4_TARGET_SOURCE.json post/R4_ASSIGNMENT_SOURCE.json post/R4_ACTUATOR_LOG.json post/R4_RESULT.json post/SHA256SUMS_POST.txt post/PRE_GIT_COMMIT_SHA.txt "$D/"
+          git add "$D"
+          git commit -m 'Preserve R4 post-source result'
+          git push origin HEAD:main
