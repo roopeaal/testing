@@ -206,7 +206,7 @@ func popParity(x uint32) uint8 {
 	x ^= x >> 8
 	x ^= x >> 4
 	x &= 0xf
-	return uint8((0x6996 >> x) & 1)
+	return uint8((uint32(0x6996) >> x) & 1)
 }
 func codeBit(msg uint32, idx uint32) uint8 {
 	q, l, c := splitMessage(msg)
