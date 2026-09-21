@@ -1,0 +1,37 @@
+name: Gate-A Actuator R4 trial2 lock check
+
+on:
+  push:
+    paths:
+      - '.github/workflows/gatea-actuator-r4-trial2-lock-check.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  lockcheck:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify immutable trial2 lock against exact source bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,json,pathlib,time
+          base=pathlib.Path('ercp/gatea-actuator-r4/trial2-source')
+          lock=json.loads((base/'GATEA_ACTUATOR_R4_LOCK.json').read_text())
+          assert lock['protocol']=='ERCP-GATEA-ACTUATOR-R4-SAME-RUNNER-RANDOMIZED-MMAP-v1'
+          assert lock['status']=='PRESOURCE_DESIGN_LOCK_TRIAL2'
+          assert lock['future_sources']['target']['round']==32397413
+          assert lock['future_sources']['assignment']['round']==32397613
+          assert time.time() < 1789995603-5400
+          for name,want in lock['release_file_hashes'].items():
+              got=hashlib.sha256((base/name).read_bytes()).hexdigest()
+              if got!=want:
+                  raise SystemExit(f'hash mismatch {name}: {got} != {want}')
+          h=hashlib.sha256((base/'GATEA_ACTUATOR_R4_LOCK.json').read_bytes()).hexdigest()
+          print('R4_TRIAL2_LOCK_GATE=PASS')
+          print('R4_TRIAL2_LOCK_SHA256='+h)
+          PY
