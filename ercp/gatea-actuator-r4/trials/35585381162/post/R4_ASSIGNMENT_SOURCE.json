@@ -1,0 +1,41 @@
+{
+  "protocol": "ERCP-GATEA-ACTUATOR-R4-drand-source-v1",
+  "fetched_utc": "2026-09-21T13:10:06Z",
+  "chain_hash": "52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971",
+  "public_key": "83cf0f2896adee7eb8b5f01fcad3912212c437e0073e911fb90022d3e760183c8c4b450b6a0a6c3ac6a5776a2d1064510d1fec758c921cc22b0e17e63aaf4bcb5ed66304de9cf809bd274ca73bab4af5a6e9c76a4bc09e76eae8991ef5ece45a",
+  "scheme_id": "bls-unchained-g1-rfc9380",
+  "round": 32397613,
+  "round_unix": 1789996203,
+  "signature": "adb70a533cda359f2404bb69a4f994857bada759a854e64df5ce82b4917ede123c90601198f8bbfe220ae1fa2787e372",
+  "randomness": "544b08b5c251fdff67517a28a6d5ffddb4e5a62166b029e03256649770be8c69",
+  "relays": [
+    {
+      "url": "https://api.drand.sh",
+      "round": 32397613,
+      "signature": "adb70a533cda359f2404bb69a4f994857bada759a854e64df5ce82b4917ede123c90601198f8bbfe220ae1fa2787e372",
+      "randomness": "544b08b5c251fdff67517a28a6d5ffddb4e5a62166b029e03256649770be8c69"
+    },
+    {
+      "url": "https://api2.drand.sh",
+      "round": 32397613,
+      "signature": "adb70a533cda359f2404bb69a4f994857bada759a854e64df5ce82b4917ede123c90601198f8bbfe220ae1fa2787e372",
+      "randomness": "544b08b5c251fdff67517a28a6d5ffddb4e5a62166b029e03256649770be8c69"
+    },
+    {
+      "url": "https://api3.drand.sh",
+      "round": 32397613,
+      "signature": "adb70a533cda359f2404bb69a4f994857bada759a854e64df5ce82b4917ede123c90601198f8bbfe220ae1fa2787e372",
+      "randomness": "544b08b5c251fdff67517a28a6d5ffddb4e5a62166b029e03256649770be8c69"
+    },
+    {
+      "url": "https://drand.cloudflare.com",
+      "round": 32397613,
+      "signature": "adb70a533cda359f2404bb69a4f994857bada759a854e64df5ce82b4917ede123c90601198f8bbfe220ae1fa2787e372",
+      "randomness": "544b08b5c251fdff67517a28a6d5ffddb4e5a62166b029e03256649770be8c69"
+    }
+  ],
+  "four_relay_exact_agreement": true,
+  "signature_to_randomness_sha256_verified": true,
+  "bls_verified": true,
+  "drand_version": "v2.1.7"
+}

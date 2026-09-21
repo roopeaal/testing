@@ -1,0 +1,47 @@
+{
+  "assignment_message28": 88387723,
+  "assignment_round": 32397613,
+  "evaluated_utc": "2026-09-21T13:10:27.081731+00:00",
+  "five_sigma_one_sided_threshold": 2.866515718791933e-07,
+  "interpretation": "NO_GATE_A_LOCAL_FUTURE_ACTUATOR_INTERACTION_IN_R4",
+  "latencies_sha256": "f24779cd3391afe51884db73000a9e4fd364ff718695919e4717c1f3ff44ef93",
+  "primary_randomized_actuator_interaction": {
+    "exact_one_sided_randomization_p": 0.05085879564285278,
+    "message": 88387722,
+    "message_space": 268435456,
+    "null_sd_exact": 77490641.39025615,
+    "observed_score": 126807680,
+    "standardized_score": 1.6364257376755316,
+    "tail_count_ge": 13652304,
+    "tail_count_gt": 13652303
+  },
+  "protocol": "ERCP-GATEA-ACTUATOR-R4-SAME-RUNNER-RANDOMIZED-MMAP-v1",
+  "receiver_sha256": "bf46cdc4aec6746e2811a4efe5db77139c787047272689a9fe89d4404f06b2df",
+  "scientific_scope": "same GitHub-hosted runner and persistent mmap file across pre-source timing receiver and later independently randomized target/active-sham physical CPU+memory actuation; primary conditions on receiver and target and randomizes over independent later assignment message; no signalling claim",
+  "secondary_assignment_main_effect": {
+    "exact_one_sided_randomization_p": 0.692664660513401,
+    "message": 88387722,
+    "message_space": 268435456,
+    "null_sd_exact": 77490641.39025615,
+    "observed_score": -38996844,
+    "standardized_score": -0.5032458539555146,
+    "tail_count_ge": 185935754,
+    "tail_count_gt": 185935747
+  },
+  "secondary_target_source_main_effect": {
+    "exact_one_sided_randomization_p": 0.5456194207072258,
+    "message": 121915296,
+    "message_space": 268435456,
+    "null_sd_exact": 77490641.39025615,
+    "observed_score": -8875540,
+    "standardized_score": -0.11453692782462929,
+    "tail_count_ge": 146463598,
+    "tail_count_gt": 146463592
+  },
+  "strong_candidate": false,
+  "substrate_post_sha256": "df607a42874e05adf2ef36a40cc8dbb5423a79f3b1f0a0320fc85c48139a8430",
+  "substrate_pre_sha256": "a568dce4fe020d47ceb993f757c07a4067b5457a774bcf69087c5c024e6468fe",
+  "target_message28": 121915297,
+  "target_round": 32397413,
+  "validity": "PASS"
+}
