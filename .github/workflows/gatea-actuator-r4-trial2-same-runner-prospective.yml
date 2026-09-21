@@ -41,7 +41,9 @@ jobs:
           python3 - <<'PY'
           import json,hashlib,time,pathlib
           r=pathlib.Path('release')
-          lock_path=r/'GATEA_ACTUATOR_R4_LOCK.json'\n          if hashlib.sha256(lock_path.read_bytes()).hexdigest()!='599ca4bd33bf767c3e3f4469bb2b1229962e1b55f650bf0aa825ee880c4d3a45': raise SystemExit('immutable trial2 lock hash mismatch')\n          lock=json.loads(lock_path.read_text())
+          lock_path=r/'GATEA_ACTUATOR_R4_LOCK.json'
+          if hashlib.sha256(lock_path.read_bytes()).hexdigest()!='599ca4bd33bf767c3e3f4469bb2b1229962e1b55f650bf0aa825ee880c4d3a45': raise SystemExit('immutable trial2 lock hash mismatch')
+          lock=json.loads(lock_path.read_text())
           assert lock['protocol']=='ERCP-GATEA-ACTUATOR-R4-SAME-RUNNER-RANDOMIZED-MMAP-v1'
           for name,want in lock['release_file_hashes'].items():
               got=hashlib.sha256((r/name).read_bytes()).hexdigest()
