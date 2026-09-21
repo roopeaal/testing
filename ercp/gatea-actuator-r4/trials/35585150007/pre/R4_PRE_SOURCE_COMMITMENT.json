@@ -1,0 +1,36 @@
+{
+  "actuator_binary_sha256": "20c37412c83f14fd73fc4ebc57c2c672580eff903f792d3cdf4762921b499fd2",
+  "assignment_round": 32397613,
+  "assignment_utc": "2026-09-21T13:10:03Z",
+  "created_utc": "2026-09-21T09:47:15.504967+00:00",
+  "file_sha256": {
+    "R4_CAPTURE_STDOUT.txt": "35312ca173822abaca5c94a4a6ba57840281a2cb7779f7e9839f2d5a876dbf9d",
+    "R4_LATENCIES_U32.bin": "7eeda43050938d8c5ca437086e0ee6213c6164bf6c5768d1afeaa3d718073f74",
+    "R4_LATENCIES_U32.bin.gz": "054278930a20e415a7111f14d21ae950602bcafa606cb0d9c4941cb232f2fb07",
+    "R4_RECEIVER.bin": "b12f238cb974b9929a35639766bade9ac239b542831875976a8eb625c4771c9d",
+    "R4_RECEIVER_META.json": "b18ff242659c577d5618c87deb6e3c34ef3d5e2597c6cbfb7122f214287d35f3"
+  },
+  "github_run_attempt": "1",
+  "github_run_id": "35585150007",
+  "go_sum_sha256": "eaab5461d7fecfbf1006054e318dfac81b7be5c5db1d962edf785b36edc6da9d",
+  "latencies_sha256": "7eeda43050938d8c5ca437086e0ee6213c6164bf6c5768d1afeaa3d718073f74",
+  "protocol": "ERCP-GATEA-ACTUATOR-R4-PRESOURCE-COMMITMENT-v1",
+  "receiver_sha256": "b12f238cb974b9929a35639766bade9ac239b542831875976a8eb625c4771c9d",
+  "release_sha256": {
+    "GATEA_ACTUATOR_R4_LOCK.json": "599ca4bd33bf767c3e3f4469bb2b1229962e1b55f650bf0aa825ee880c4d3a45",
+    "README.md": "7d64675c84b11d603b7a743eb3e6a363a2298f471096fa06348d4e5d7e96d97e",
+    "actuate_r4.go": "e991fc19e7921677746ea3f8e832ec98480a7664beb56e41aaa754d84b4d5ca3",
+    "capture_r4.py": "9fbb44be66a49d0080b7038dfe02ac127c13b0fea041c82d827c9565c1a3c5fe",
+    "evaluate_r4.py": "823639811c1d85a1b944e2aa8c453496cc8e880b11b6fc1ce162898bbb68c36b",
+    "gatea_actuator_r4_qrm.py": "b4e74a131fa319eadff3fd8a726214ab29bf5215f737c4b3a16aaccc9639633e",
+    "go.mod": "1a1d7bd948ae0734f03f90177b9e72b429d8ef36ed8412270c6f286bf7fd5624",
+    "r4_actuator": "20c37412c83f14fd73fc4ebc57c2c672580eff903f792d3cdf4762921b499fd2",
+    "requirements.txt": "45b4f0d51c9c7f631e004c8ee6971088b263b50adf867f3c66564b2856ec01f9"
+  },
+  "scientific_validity": "Only GITHUB_RUN_ATTEMPT=1 can be confirmatory; rerun after failure is invalid/inconclusive.",
+  "statement": "Receiver and exact executable frozen before either future drand source; no source-fetch step occurs before post-assignment actuator.",
+  "substrate_sha256": "a568dce4fe020d47ceb993f757c07a4067b5457a774bcf69087c5c024e6468fe",
+  "target_round": 32397413,
+  "target_utc": "2026-09-21T13:00:03Z",
+  "workflow_trigger_sha": "acfac26603151ba8726a2d251e677c96e8f83438"
+}

@@ -1,0 +1,32 @@
+{
+  "N": 262144,
+  "assignment_round": 32397613,
+  "assignment_utc": "2026-09-21T13:10:03+00:00",
+  "capture_ended_utc": "2026-09-21T09:47:15.444740+00:00",
+  "capture_started_utc": "2026-09-21T09:47:13.185176+00:00",
+  "cell_bytes": 64,
+  "host_identity": {
+    "boot_id": "9e7c39df-8f6f-4678-b656-7849ea7254eb",
+    "cpuinfo_sha256": "ac70a8a39385e63214665966c59b802f979e88c5ec12358370fb86ccf2a8ef73",
+    "github_run_attempt": "1",
+    "github_run_id": "35585150007",
+    "github_sha": "acfac26603151ba8726a2d251e677c96e8f83438",
+    "hostname": "runnervmlun5p",
+    "platform": "Linux-6.17.0-1022-azure-x86_64-with-glibc2.39",
+    "runner_name": "GitHub Actions 1000002861"
+  },
+  "latencies_gzip_sha256": "054278930a20e415a7111f14d21ae950602bcafa606cb0d9c4941cb232f2fb07",
+  "latencies_sha256": "7eeda43050938d8c5ca437086e0ee6213c6164bf6c5768d1afeaa3d718073f74",
+  "measurement_order": "18-bit bit-reversal traversal; result stored by coordinate index i",
+  "primary_receiver_weight_rule": "z_i=2*rank_i-(N-1), rank by (latency_ns,index)",
+  "protocol": "ERCP-GATEA-ACTUATOR-R4-SAME-RUNNER-MMAP-v1",
+  "receiver_ones": 131072,
+  "receiver_rule": "rank raw per-cell 8xSHA256 timing by (latency_ns,index); bit=1 iff rank>=N/2",
+  "receiver_sha256": "b12f238cb974b9929a35639766bade9ac239b542831875976a8eb625c4771c9d",
+  "receiver_zeros": 131072,
+  "substrate_bytes": 16777216,
+  "substrate_sha256": "a568dce4fe020d47ceb993f757c07a4067b5457a774bcf69087c5c024e6468fe",
+  "target_round": 32397413,
+  "target_utc": "2026-09-21T13:00:03+00:00",
+  "timing_sink": 74
+}
