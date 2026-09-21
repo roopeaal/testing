@@ -1,0 +1,100 @@
+name: Gate-A Actuator R4 trial2 preflight
+
+on:
+  push:
+    paths:
+      - '.github/workflows/gatea-actuator-r4-trial2-preflight.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify source constants and time margin
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import pathlib,time,re
+          base=pathlib.Path('ercp/gatea-actuator-r4/trial2-source')
+          cap=(base/'capture_r4.py').read_text()
+          ev=(base/'evaluate_r4.py').read_text()
+          go=(base/'actuate_r4.go').read_text()
+          for needle in ['32_397_413','1_789_995_603','32_397_613','1_789_996_203']:
+              if needle not in cap and needle not in ev:
+                  raise SystemExit(f'missing Python constant {needle}')
+          for needle in ['32397413','1789995603','32397613','1789996203']:
+              if needle not in go:
+                  raise SystemExit(f'missing Go constant {needle}')
+          if time.time() >= 1789995603-3600:
+              raise SystemExit('preflight has less than 60 min before target')
+          print('R4_TRIAL2_CONSTANTS_AND_MARGIN=PASS')
+          PY
+
+      - name: Print exact source SHA256
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd ercp/gatea-actuator-r4/trial2-source
+          sha256sum README.md actuate_r4.go capture_r4.py evaluate_r4.py gatea_actuator_r4_qrm.py go.mod requirements.txt | tee ../../../R4_TRIAL2_PREFLIGHT_SHA256SUMS.txt
+
+      - name: Install frozen Python dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check -r ercp/gatea-actuator-r4/trial2-source/requirements.txt
+          python3 - <<'PY'
+          import numpy,numba
+          print('numpy',numpy.__version__,'numba',numba.__version__)
+          assert numpy.__version__=='2.3.5'
+          assert numba.__version__=='0.65.1'
+          PY
+
+      - name: Validate bit reversal and Python evaluator
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="$PWD/ercp/gatea-actuator-r4/trial2-source"
+          python3 - <<'PY'
+          import capture_r4
+          capture_r4.validate_bitrev18_permutation()
+          print('R4_TRIAL2_BITREV_BIJECTION=PASS')
+          PY
+          python3 ercp/gatea-actuator-r4/trial2-source/evaluate_r4.py selftest | tee py-selftest.txt
+          grep -F '"selftest": "PASS"' py-selftest.txt
+
+      - name: Build and cross-check Go actuator
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build
+          cp ercp/gatea-actuator-r4/trial2-source/go.mod ercp/gatea-actuator-r4/trial2-source/actuate_r4.go build/
+          cd build
+          go mod tidy
+          go build -trimpath -o r4_actuator actuate_r4.go
+          ./r4_actuator --mode selftest | tee go-selftest.txt
+          grep -F 'SELFTEST message=0 ones=0 sha256=c35020473aed1b4642cd726cad727b63fff2824ad68cedd7ffb73c7cbd890479' go-selftest.txt
+          grep -F 'SELFTEST message=1 ones=262144 sha256=2d864c0b789a43214eee8524d3182075125e5ca2cd527f3582ec87ffd94076bc' go-selftest.txt
+          grep -F 'SELFTEST message=10855845 ones=130816 sha256=f774e3816717fda655798cd43acf1b74c6f4ba71aac7ce8c9d141f8a87eb6f97' go-selftest.txt
+          grep -F 'SELFTEST message=268435455 ones=130816 sha256=37fba550811df5881906f848dec02aff5fbfb70630f1e2b2fef5cd0a40b25c7d' go-selftest.txt
+          grep -F 'R4_ACTUATOR_SELFTEST=PASS' go-selftest.txt
+          sha256sum r4_actuator go.sum | tee ../R4_TRIAL2_BINARY_SHA256SUMS.txt
+
+      - name: Upload preflight evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: gatea-actuator-r4-trial2-preflight
+          path: |
+            R4_TRIAL2_PREFLIGHT_SHA256SUMS.txt
+            R4_TRIAL2_BINARY_SHA256SUMS.txt
+            py-selftest.txt
+            build/go-selftest.txt
+            build/go.sum
+          if-no-files-found: error
+          compression-level: 9
